@@ -1,0 +1,17 @@
+# Gradle
+.gradle
+build
+gradlew.bat
+target
+
+# Artifacts
+/checks.sh
+/fig.yml
+
+# IntelliJ IDEA
+.idea
+classes
+out
+*.iml
+*.ipr
+*.iws
