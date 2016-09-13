@@ -1,3 +1,5 @@
+import scala.collection.mutable.ListBuffer
+
 /**
   * Exercises: http://aperiodic.net/phil/scala/s-99/#graphs
   */
@@ -43,11 +45,35 @@ abstract class GraphBase[T, U] {
   }
 
   // P80
-  def toTermForm: (List[T], List[(T, T, U)]) = ???
+  def toTermForm: (List[T], List[(T, T, U)]) = {
+    val nodesRes = nodes.keys.toList
+    val edgesRes: List[(T, T, U)] = edges.map(e => (e.n1.value, e.n2.value, e.value))
 
-  def toAdjacentForm: List[(T, List[(T, U)])] = ???
+    (nodesRes, edgesRes)
+  }
 
-  override def toString: String = s"G(${nodes.keys}, ${edges.map(_.toTuple)})"
+  def toAdjacentForm: List[(T, List[(T, U)])] = {
+    nodes.values.map { n => (n.value, edges
+      .filter(e => e.n1 == n || e.n2 == n)
+      .foldLeft(Set[(T,U)]()) { (acc, e) =>
+        if (e.n1 == n)
+          acc + ((e.n2.value, e.value))
+        else
+          acc + ((e.n1.value, e.value))
+      }.toList)
+    }.toList
+  }
+
+  override def toString: String = {
+    val (edgeStrings, edgesNodes) = edges.foldRight((List[String](), List[Node]())) {(e, acc) =>
+      val maybeLabel = if (e.value != ()) s"/${e.value}" else ""
+      (s"${e.n1.value}-${e.n2.value}$maybeLabel" :: acc._1, e.n1::e.n2::acc._2)
+    }
+    val missingNodes = nodes.values.toList.diff(edgesNodes).map(n => s"${n.value}"):::edgeStrings
+
+    val x = missingNodes.mkString(", ")
+    s"[$x]"
+  }
 
   // P81
   def findPaths(from: T, to: T): List[List[T]] = ???
@@ -89,7 +115,53 @@ class Graph[T, U] extends GraphBase[T, U] {
   }
 
   // P83
-  def spanningTrees: List[Graph[T, U]] = ???
+  def spanningTrees: List[Graph[T, U]] = {
+    def go1(edges:List[Edge], cur:List[Edge]):List[List[Edge]] = {
+      val visited = ListBuffer[Node]()
+      val res: List[List[Edge]] = for {
+        e <- edges
+      } yield {
+//        println(s"Calling findSingleSpanningTree with Edge: $e | edges: ${edges.filterNot(_ ==e)}")
+        //visited += e.n1
+        findSingleSpanningTree(e, edges.filterNot(_ == e), nodes.size -1, List(e), List(), visited)
+      }.flatten
+      res
+
+    }
+
+    def findSingleSpanningTree(edge: Edge, edges: List[Edge], counter: Int,
+                               current: List[Edge], acc:List[List[Edge]], visited: ListBuffer[Node] ): List[List[Edge]] = {
+      println(s"--Edge: $edge | Edges: $edges | Counter: $counter | Current: $current | Acc: $acc | Visted: $visited")
+      if (counter == 1)
+        current::acc
+      else {
+        for {
+          (e,n) <- everyAdjacentEdgeTo(edge, edges, visited)
+        } yield {
+          findSingleSpanningTree(e, edges.filterNot(_ == e), counter - 1, e::current, acc, visited)
+        }
+      }.flatten
+    }
+
+    def everyAdjacentEdgeTo(edge: Edge, edges: List[Edge], visitedNode: ListBuffer[Node]): List[(Edge,Node)] = {
+      val adj = edges.filter(e =>  e.n1 == edge.n1 || e.n1 == edge.n2 || e.n2 == edge.n1 || e.n2 == edge.n2)
+        .filterNot(e => visitedNode.contains(e.n1) || visitedNode.contains(e.n2))
+      val x = adj.zip(adj.map {e => if(e.n1 == edge.n1 ) {visitedNode += e.n1;e.n1} else {visitedNode += e.n2;e.n2}})
+//      println(s"edge $edge edges $edges visited $visitedNode --> $x")
+      x
+    }
+
+    if (edges.isEmpty) {
+      List(Graph.termLabel[T, U](nodes.keys.toList, List()))
+    } else if (nodes.values.toList.diff(edges.flatMap(e => List(e.n1, e.n2))).size > 0) {
+      List()
+    } else {
+      val trees: List[List[Edge]] = go1(edges, List(edges.head))
+      trees.map { (l: List[Edge]) =>
+        Graph.termLabel[T, U](l.flatMap(e => List(e.n1.value, e.n2.value)), l.flatMap(e => List((e.n1.value, e.n2.value, e.value))))
+      }
+    }
+  }
 
   def isTree: Boolean = ???
 
@@ -110,6 +182,15 @@ class Digraph[T, U] extends GraphBase[T, U] {
     val e = new Edge(nodes(source), nodes(dest), value)
     edges = e :: edges
     nodes(source).adj = e :: nodes(source).adj
+  }
+
+  override def toAdjacentForm: List[(T, List[(T, U)])] = {
+    nodes.values.map { n => (n.value, edges
+      .filter(e => e.n1 == n)
+      .foldLeft(Set[(T, U)]()) { (acc, e) =>
+        acc + ((e.n2.value, e.value))
+      }.toList)
+    }.toList
   }
 }
 
@@ -132,7 +213,6 @@ abstract class GraphObjBase {
 
   def adjacentLabel[T, U](nodes: List[(T, List[(T, U)])]): GraphClass[T, U]
 
-  // P80
   def fromString(s: String): GraphClass[String, Unit] = ???
 
   def fromStringLabel(s: String): GraphClass[String, Any] = ???
@@ -157,6 +237,52 @@ object Graph extends GraphObjBase {
     }
     g
   }
+
+  // P80
+  override def fromString(s: String): GraphClass[String, Unit] = {
+    val stringRegex = "\\[(.*?)\\]".r
+    val edgeRegex = "(.*?)-(.*?)".r
+
+    def go(stringNodes: List[String], nodes: List[String], edges: List[(String, String)]):GraphClass[String, Unit] = {
+      stringNodes match {
+        case Nil => Graph.term(nodes.distinct, edges)
+        case h::t => h match {
+          case edgeRegex(n1, n2) => go(t, n1::n2::nodes, (n1, n2)::edges)
+          case x => go(t, x::nodes, edges)
+        }
+      }
+    }
+
+    s match {
+      case stringRegex(string) => go(string.split(",").map(_.trim).toList, List(), List())
+      case _ => throw new IllegalArgumentException("")
+    }
+  }
+
+  override def fromStringLabel(s: String): GraphClass[String, Any] = {
+    val stringRegex = "\\[(.*?)\\]".r
+    val edgeRegex = "(.*?)-(.*?)".r
+    val labelRegex = "/(.*?)".r
+
+    def go(stringNodes: List[String], nodes: List[String], edges: List[(String, String, Any)]):GraphClass[String, Any] = {
+      stringNodes match {
+        case Nil => Graph.termLabel(nodes.distinct, edges)
+        case h::t => h match {
+          case edgeRegex(n1, n2) => n2 match {
+            case labelRegex(label) =>  go(t, n1::n2::nodes, (n1, n2, label)::edges)
+            case _ => go(t, n1::n2::nodes, (n1, n2, ())::edges)
+          }
+          case x => go(t, x::nodes, edges)
+        }
+      }
+    }
+
+    s match {
+      case stringRegex(string) => go(string.split(",").map(_.trim).toList, List(), List())
+      case _ => throw new IllegalArgumentException("")
+    }
+  }
+
 }
 
 object Digraph extends GraphObjBase {

@@ -75,19 +75,53 @@ object S99List {
   }
 
   // P08
-  def compress[T](l: List[T]): List[T] = ???
+  def compress[T](l: List[T]): List[T] = {
+    l.foldRight(List[T]()) { (e, acc) => acc match {
+      case x :: tail if x == e => acc
+      case _ => e::acc
+      }
+    }
+  }
 
   // P09
-  def pack[T](l: List[T]): List[List[T]] = ???
+  def pack[T](l: List[T]): List[List[T]] = {
+    def go(acc: List[List[T]], rem: List[T]): List[List[T]] = {
+      rem  match {
+        case Nil => acc
+        case h::t if acc.isEmpty || acc.last.head != h => go(acc:::List(List(h)), t)
+        case h:: t => go(acc.init:::List(acc.last:::List(h)), t)
+      }
+    }
+    go(List.empty, l)
+  }
 
   // P10
-  def encode[T](l: List[T]): List[(Int, T)] = ???
+  def encode[T](l: List[T]): List[(Int, T)] = {
+    l.foldRight(List[(Int, T)]()) {(e, acc) => acc match {
+      case x::tail => if (x._2 == e) (x._1 + 1, e)::tail else (1, e)::acc
+      case _ => (1, e)::acc
+    }
+    }
+  }
 
   // P11
-  def encodeModified[T](l: List[T]): List[Any] = ???
+  def encodeModified[T](l: List[T]): List[Any] = {
+    encode(l).foldRight(List[Any]()){ (e, acc) => e match {
+      case (i, x) if i > 1 => (i, x)::acc
+      case (i, x) => x::acc
+    }
+    }
+  }
 
   // P12
-  def decode[T](l: List[(Int, T)]): List[T] = ???
+  def decode[T](l: List[(Int, T)]): List[T] = {
+    for {
+      e <- l
+      i <- 0 until e._1
+    } yield {
+      e._2
+    }
+  }
 
   // P13
   def encodeDirect[T](l: List[T]): List[(Int, T)] = ???

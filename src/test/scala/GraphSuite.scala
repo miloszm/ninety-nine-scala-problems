@@ -3,12 +3,15 @@ import java.util.NoSuchElementException
 import org.scalatest.{FunSuite, Inspectors, Matchers}
 
 class GraphSuite extends FunSuite with Matchers with Inspectors {
+
   test("80 (not mentioned in problem statements) graphs constructed from equivalent forms are equal") {
     val gt = Graph.term(
       List('b, 'c, 'd, 'f, 'g, 'h, 'k),
       List(('b, 'c), ('b, 'f), ('c, 'f), ('f, 'k), ('g, 'h)))
+
     val ga = Graph.adjacent(
       List(('b, List('c, 'f)), ('c, List('b, 'f)), ('d, Nil), ('f, List('b, 'c, 'k)), ('g, List('h)), ('h, List('g)), ('k, List('f))))
+
     gt shouldEqual ga
   }
 
@@ -116,6 +119,10 @@ class GraphSuite extends FunSuite with Matchers with Inspectors {
 
   test("80 convert human-friendly form with labels to labeled graph") {
     val g = Graph.termLabel(List("d", "k", "h", "c", "f", "g", "b"), List(("h", "g", "3"), ("k", "f", ()), ("f", "b", ()), ("g", "h", "2"), ("f", "c", ()), ("b", "c", "1")))
+
+    println(g.toString.replaceAll(" ", "X"))
+    println("----")
+    println(Graph.fromStringLabel("[b-c/1, f-c, g-h/2, d, f-b, k-f, h-g/3]").toString.replaceAll(" ", "X"))
     Graph.fromStringLabel("[b-c/1, f-c, g-h/2, d, f-b, k-f, h-g/3]") shouldEqual g
   }
 

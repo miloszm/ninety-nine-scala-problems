@@ -2,6 +2,7 @@ import MTree._
 import org.scalatest.{FunSuite, Matchers}
 
 class MultiwayTreeSuite extends FunSuite with Matchers {
+
   test("70 (not mentioned in problem statements) construct example multi-way tree") {
     MTree('a)
     MTree('a, List(MTree('f, List(MTree('g))), MTree('c), MTree('b, List(MTree('d), MTree('e)))))

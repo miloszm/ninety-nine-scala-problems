@@ -2,6 +2,7 @@ import Tree._
 import org.scalatest.{FunSuite, Matchers}
 
 class TreeSuite extends FunSuite with Matchers {
+
   test("51 (not mentioned in problem statements) construct empty tree") {
     End
   }
