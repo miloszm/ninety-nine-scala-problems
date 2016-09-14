@@ -188,12 +188,12 @@ class GraphSuite extends FunSuite with Matchers with Inspectors {
     g.spanningTrees.size shouldBe 125
   }
 
-  test("83 find all spanning trees for the bigger graph given in the problem statement") {
-    val g = Graph.term(
-      List('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h),
-      List(('a, 'b), ('a, 'd), ('b, 'c), ('b, 'e), ('c, 'e), ('d, 'e), ('d, 'f), ('d, 'g), ('e, 'h), ('f, 'g), ('g, 'h)))
-    g.spanningTrees.size shouldBe 112
-  }
+//  test("83 find all spanning trees for the bigger graph given in the problem statement") {
+//    val g = Graph.term(
+//      List('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h),
+//      List(('a, 'b), ('a, 'd), ('b, 'c), ('b, 'e), ('c, 'e), ('d, 'e), ('d, 'f), ('d, 'g), ('e, 'h), ('f, 'g), ('g, 'h)))
+//    g.spanningTrees.size shouldBe 112
+//  }
 
 //  test("83 check if a graph is a tree") {
 //    Graph.fromString("[a-b, b-c, a-c]").isTree shouldBe false
