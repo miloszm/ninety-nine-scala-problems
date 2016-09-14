@@ -1,3 +1,4 @@
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
 /**
@@ -7,6 +8,7 @@ abstract class GraphBase[T, U] {
 
   case class Edge(n1: Node, n2: Node, value: U) {
     def toTuple = (n1.value, n2.value, value)
+    override def toString: String = n1.value.toString + "-" + n2.value.toString
   }
 
   case class Node(value: T) {
@@ -17,6 +19,8 @@ abstract class GraphBase[T, U] {
 
     // P86
     def degree: Int = ???
+
+    override def toString: String = this.value.toString
   }
 
   var nodes: Map[T, Node] = Map()
@@ -99,6 +103,31 @@ abstract class GraphBase[T, U] {
   def isBipartite: Boolean = ???
 }
 
+object SubsetsGenerator {
+
+  def generateSubsets[T](set:List[T]): List[List[T]] = {
+    def go(set:List[T], index:Int): List[List[T]] = {
+      if (index > 0) {
+        val all = go(set, index-1)
+        val item = set(index-1)
+        val moreSubsets =
+          for {subset <- all}
+            yield {
+              item :: subset
+            }
+        all ::: moreSubsets
+      }
+      else {
+        List(List())
+      }
+    }
+    go(set, set.size)
+  }
+
+}
+
+
+
 class Graph[T, U] extends GraphBase[T, U] {
   override def canEqual(other: Any): Boolean = other.isInstanceOf[Graph[_, _]]
 
@@ -114,42 +143,250 @@ class Graph[T, U] extends GraphBase[T, U] {
     nodes(n2).adj = e :: nodes(n2).adj
   }
 
+
+/////////////////////////////////////////////////////////////////////
+
+
   // P83
   def spanningTrees: List[Graph[T, U]] = {
-    def go1(edges:List[Edge], cur:List[Edge]):List[List[Edge]] = {
-      val visited = ListBuffer[Node]()
-      val res: List[List[Edge]] = for {
-        e <- edges
-      } yield {
-//        println(s"Calling findSingleSpanningTree with Edge: $e | edges: ${edges.filterNot(_ ==e)}")
-        //visited += e.n1
-        findSingleSpanningTree(e, edges.filterNot(_ == e), nodes.size -1, List(e), List(), visited)
-      }.flatten
-      res
 
+    val sol = mutable.Set[String]()
+
+    def isOK(ee:List[Edge]):Boolean = {
+      ee.map(e => List(e.n1, e.n2)).flatten.distinct.size == 5
     }
 
-    def findSingleSpanningTree(edge: Edge, edges: List[Edge], counter: Int,
-                               current: List[Edge], acc:List[List[Edge]], visited: ListBuffer[Node] ): List[List[Edge]] = {
-      println(s"--Edge: $edge | Edges: $edges | Counter: $counter | Current: $current | Acc: $acc | Visted: $visited")
-      if (counter == 1)
-        current::acc
+    def edgesToStr(ee:List[Edge]):String = {
+
+      def go(ee:List[Edge], prev:Option[Node], acc:String):String = ee match {
+        case Nil => acc
+        case h :: t =>
+          if (prev.isEmpty) {
+            go(t, Some(h.n2), acc + ee.head.n1.value + ee.head.n2.value)
+          }
+          else {
+            val f1 = ee.find(e => e.n1 == prev.get)
+            val f2 = ee.find(e => e.n2 == prev.get)
+            (f1,f2) match {
+              case (Some(x),_) => go(ee.filter(_ != x), Some(x.n2), acc + x.n2.value)
+              case (None,Some(y)) => go(ee.filter(_ != y), Some(y.n1), acc + y.n1.value)
+              case _ => go(ee, None, acc)// should not happen
+            }
+          }
+      }
+      go(ee, None, "")
+    }
+
+    def go(edges: List[Edge], stNumEdges: Int): List[List[Edge]] = {
+      if (sol.contains(edgesToStr(edges))){
+        List()
+      }
       else {
-        for {
-          (e,n) <- everyAdjacentEdgeTo(edge, edges, visited)
-        } yield {
-          findSingleSpanningTree(e, edges.filterNot(_ == e), counter - 1, e::current, acc, visited)
+        edges match {
+          case ee if (ee.size == stNumEdges) => if (isOK(ee)) sol += edgesToStr(ee); List(ee)
+          case ee if (ee.size > stNumEdges) =>
+            val x = for {
+              e <- ee
+              if (canBeRemoved(e, ee))
+            } yield {
+              go(ee.filter(_ != e), stNumEdges)
+            }
+            x.flatten.filter(!_.isEmpty)
         }
-      }.flatten
+      }
     }
 
-    def everyAdjacentEdgeTo(edge: Edge, edges: List[Edge], visitedNode: ListBuffer[Node]): List[(Edge,Node)] = {
-      val adj = edges.filter(e =>  e.n1 == edge.n1 || e.n1 == edge.n2 || e.n2 == edge.n1 || e.n2 == edge.n2)
-        .filterNot(e => visitedNode.contains(e.n1) || visitedNode.contains(e.n2))
-      val x = adj.zip(adj.map {e => if(e.n1 == edge.n1 ) {visitedNode += e.n1;e.n1} else {visitedNode += e.n2;e.n2}})
-//      println(s"edge $edge edges $edges visited $visitedNode --> $x")
-      x
+    def canBeRemoved(e:Edge, ee:List[Edge]):Boolean = {
+      (ee.filter(edge => edge.n1 == e.n1 || edge.n2 == e.n1).size >= 2) &&
+      (ee.filter(edge => edge.n1 == e.n2 || edge.n2 == e.n2).size >= 2)
     }
+
+    if (edges.isEmpty) {
+      List(Graph.termLabel[T, U](nodes.keys.toList, List()))
+    } else if (nodes.values.toList.diff(edges.flatMap(e => List(e.n1, e.n2))).size > 0) {
+      List()
+    } else {
+      val trees: List[List[Edge]] = go(edges, nodes.size-1)
+      println(trees.distinct)
+      println(trees.distinct.size)
+      println(trees.size)
+      val treesSorted = trees.map(_.sortBy(_.toString)).distinct
+      println(treesSorted.size)
+      println(s"sol=${sol.size}")
+      sol.toList.sortBy(_.toString).foreach(a => println(a))
+      trees.distinct.map { (l: List[Edge]) =>
+        val nodes = l.foldLeft(List[T]())((a,b) => b.n1.value::(b.n2.value::a)).distinct
+        val edges = l.map(e => (e.n1.value, e.n2.value, e.value))
+        Graph.termLabel[T, U](nodes, edges)
+      }
+    }
+
+  }
+
+
+/////////////////////////////////////////////////////////////////////
+
+
+
+
+  // P83
+  def spanningTrees3: List[Graph[T, U]] = {
+
+    def go(nodes:List[Node]):List[List[Edge]] = {
+      println(s"nodes $nodes")
+      nodes match {
+        case n1 :: n2 :: Nil => List(getEdge(n1,n2).toList)
+        case h :: t =>
+          val goresult = if (go(t).isEmpty) List(getEdge(t.head,h).toList:::getEdge(t.tail.head,h).toList) else go(t)
+            val ll = for {
+              l <- goresult
+            } yield {
+              addVertex(l, h)
+            }
+            ll.flatten
+      }
+    }
+
+    def addVertex(ee:List[Edge], n:Node):List[List[Edge]] = {
+      val sol = mutable.Set[List[Edge]]()
+      for(v <- toSetOfVertices(ee)
+          if (existsEdge(v,n)))
+      {
+        val newEdges = getEdge(v,n).get::ee
+        sol += newEdges
+        permuteEdges(ee, n, sol)
+      }
+      println(s"sol $sol")
+
+      sol.toList
+    }
+
+    def permuteEdges(ee:List[Edge], n:Node, sol:mutable.Set[List[Edge]]):Unit = {
+      if (!ee.isEmpty) {
+        for {
+          s <- SubsetsGenerator.generateSubsets(ee)
+          d = ee.diff(s)
+          if (!d.isEmpty)
+          if (d.forall(e => existsEdge(e.n1, n) && existsEdge(e.n2, n)))
+        } {
+          val newEdges = for {
+            dd <- d
+          } yield {
+            getEdge(dd.n1, n).toList:::getEdge(dd.n2, n).toList
+          }
+          val x = newEdges.flatten.distinct
+          sol += x ::: s
+        }
+      }
+    }
+
+    def toSetOfVertices(ee:List[Edge]):Set[Node] = ee match {
+      case Nil => Set.empty
+      case h::tail => toSetOfVertices(tail) + h.n1 + h.n2
+    }
+
+    def existsEdge(n1:Node, n2:Node):Boolean = getEdge(n1, n2).isDefined
+
+    def getEdge(n1:Node, n2:Node):Option[Edge] = {
+      edges.find(e => (e.n1 == n1 && e.n2 == n2 || e.n1 == n2 && e.n2 == n1))
+    }
+
+    if (edges.isEmpty) {
+      List(Graph.termLabel[T, U](nodes.keys.toList, List()))
+    } else if (nodes.values.toList.diff(edges.flatMap(e => List(e.n1, e.n2))).size > 0) {
+      List()
+    } else {
+      val trees: List[List[Edge]] = go(nodes.values.toList)
+      trees.map { (l: List[Edge]) =>
+        Graph.termLabel[T, U](l.flatMap(e => List(e.n1.value, e.n2.value)), l.flatMap(e => List((e.n1.value, e.n2.value, e.value))))
+      }
+    }
+  }
+
+
+
+  // P83
+  def spanningTrees2: List[Graph[T, U]] = {
+    def go1(edges:List[Edge], cur:List[Edge]):List[List[Edge]] = {
+      val trees = ListBuffer[List[Edge]]()
+      nodes.values.toList.foreach{
+        n => findSingleSpanningTree(n, nodes.values.toList.filterNot(_ == n), nodes.size -1, List(n), trees)
+      }
+      trees.toList
+
+    }
+
+    def findSingleSpanningTree(node: Node, nds: List[Node], counter: Int,
+                               current: List[Node], acc:ListBuffer[List[Edge]]): List[Edge] = {
+//      println(s"--Node: $node | Nodes: $nds | Counter: $counter | Current: $current | Acc: $acc ")
+//      if (counter == 0)
+//        println(s"--Current: $current")
+      if (counter == 1)
+        toEdges(current)
+      else {
+        val x = for {
+          v <- everyAdjacentVertexTo(node, nds)
+        } yield {
+          findSingleSpanningTree(v, nds.filterNot(_ == v), counter - 1, v::current, acc)
+        }
+        acc += x.flatten
+        x.flatten
+      }
+    }
+
+    def everyAdjacentVertexTo(node: Node, nds:List[Node]): List[Node] = {
+      for {
+        v <- nds
+        if (existsEdge(node,v))
+      } yield {
+        v
+      }
+    }
+
+    def existsEdge(n1:Node, n2:Node):Boolean = getEdge(n1, n2).isDefined
+
+    def getEdge(n1:Node, n2:Node):Option[Edge] = {
+      edges.find(e => (e.n1 == n1 && e.n2 == n2 || e.n1 == n2 && e.n2 == n1))
+    }
+
+    def toEdges2(nds: List[List[Node]]):List[List[Edge]] = {
+      println(nds)
+      for {
+        l <- nds
+        z = l.zip(l.drop(1))
+      } yield {
+        for {
+          (n1, n2) <- z
+          if (existsEdge(n1, n2))
+        } yield {
+          getEdge(n1, n2).get
+        }
+      }
+    }
+
+    def toEdges(nds: List[Node]):List[Edge] = {
+      val l = nds
+      val z = l.zip(l.drop(1))
+      for {
+        (n1, n2) <- z
+        if (existsEdge(n1, n2))
+      } yield {
+        getEdge(n1, n2).get
+      }
+    }
+
+//    def higherNode(edge:Edge):Node = {
+//      val n1 = edge.n1
+//      val n2 = edge.n2
+//      if (n1.hashCode() > n2.hashCode()) n1 else n2
+//    }
+
+
+
+
+
+
+
 
     if (edges.isEmpty) {
       List(Graph.termLabel[T, U](nodes.keys.toList, List()))
